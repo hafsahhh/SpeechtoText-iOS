@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21701" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="BYZ-38-t0r">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="21507" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="BYZ-38-t0r">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21679"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="21505"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -32,19 +32,28 @@
                                     <action selector="startStopBtnAct:" destination="BYZ-38-t0r" eventType="touchUpInside" id="vb0-zx-Y41"/>
                                 </connections>
                             </button>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="7PF-by-GeF">
+                                <rect key="frame" x="149.33333333333337" y="108.99999999999999" width="223.66666666666663" height="54.333333333333329"/>
+                                <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                            </view>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                         <constraints>
                             <constraint firstAttribute="bottom" secondItem="a7H-nw-ZP4" secondAttribute="bottom" id="0SD-B1-G53"/>
+                            <constraint firstItem="7PF-by-GeF" firstAttribute="top" secondItem="6Tk-OE-BBY" secondAttribute="top" constant="50" id="78a-1D-nhN"/>
+                            <constraint firstItem="7PF-by-GeF" firstAttribute="leading" secondItem="LUS-6W-BQA" secondAttribute="trailing" constant="20" id="CYJ-oZ-PK2"/>
                             <constraint firstItem="LUS-6W-BQA" firstAttribute="leading" secondItem="6Tk-OE-BBY" secondAttribute="leading" constant="20" id="FeQ-eB-XsG"/>
                             <constraint firstItem="6Tk-OE-BBY" firstAttribute="trailing" secondItem="a7H-nw-ZP4" secondAttribute="trailing" constant="20" id="OZ1-z6-imq"/>
                             <constraint firstItem="a7H-nw-ZP4" firstAttribute="top" secondItem="LUS-6W-BQA" secondAttribute="bottom" constant="30" id="SQ9-dH-kC1"/>
                             <constraint firstItem="a7H-nw-ZP4" firstAttribute="leading" secondItem="6Tk-OE-BBY" secondAttribute="leading" constant="20" id="h97-S7-74H"/>
                             <constraint firstItem="LUS-6W-BQA" firstAttribute="top" secondItem="6Tk-OE-BBY" secondAttribute="top" constant="70" id="hVS-8K-dg4"/>
+                            <constraint firstItem="6Tk-OE-BBY" firstAttribute="trailing" secondItem="7PF-by-GeF" secondAttribute="trailing" constant="20" id="na2-HN-0Gi"/>
+                            <constraint firstItem="a7H-nw-ZP4" firstAttribute="top" secondItem="7PF-by-GeF" secondAttribute="bottom" constant="30" id="wuY-t3-02f"/>
                         </constraints>
                     </view>
                     <connections>
+                        <outlet property="audioWaveView" destination="7PF-by-GeF" id="jcF-Hu-3rN"/>
                         <outlet property="startStopBtn" destination="LUS-6W-BQA" id="KR1-6b-NhX"/>
                         <outlet property="textView" destination="a7H-nw-ZP4" id="QEa-EO-PSq"/>
                     </connections>
