@@ -208,11 +208,13 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
             // Calculate the new X and Y coordinates for drawing the audio wave.
             let x = CGFloat(self.audioWavePath.currentPoint.x + 1.0)
             let viewHeight = self.audioWaveView.bounds.height
-            let newY = viewHeight / 2.0 - CGFloat(maxAmplitude) * (viewHeight / 2.0)
+            let newY = viewHeight - CGFloat(maxAmplitude) * (viewHeight)
+
             
             // Move the path to the new point and add a line segment to represent the audio wave.
             self.audioWavePath.move(to: CGPoint(x: x, y: newY))
-            self.audioWavePath.addLine(to: CGPoint(x: x, y: viewHeight / 2.0))
+            self.audioWavePath.addLine(to: CGPoint(x: x, y: viewHeight))
+
             
             // Set the updated path to the CAShapeLayer for visualizing the audio wave.
             self.audioWaveLayer?.path = self.audioWavePath.cgPath
