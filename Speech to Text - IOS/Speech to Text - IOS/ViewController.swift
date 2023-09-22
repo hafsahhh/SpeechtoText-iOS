@@ -226,8 +226,8 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
                 self.audioWaveLayer?.path = nil
             }
             
-//            print("Max Amplitude: \(maxAmplitude)")
-//            print("x: \(x), newY: \(newY)")
+            print("Max Amplitude: \(maxAmplitude)")
+            print("x: \(x), newY: \(newY)")
         }
     }
     
@@ -239,3 +239,5 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
         }
     }
 }
+
+
