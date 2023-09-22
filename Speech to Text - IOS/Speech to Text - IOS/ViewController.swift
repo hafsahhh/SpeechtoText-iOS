@@ -30,6 +30,13 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
     var audioWavePath = UIBezierPath()
     var audioWaveColor = UIColor.red.cgColor
     var audioWaveLineWidth: CGFloat = 2.0
+    private var lastAudioReceivedTime: Date? = nil
+    // Adjust this threshold as needed
+    private let silenceThreshold: Float = 0.1
+    // Adjust this threshold as needed
+    private let silenceThresholdSeconds: TimeInterval = 1.0
+    var isAudioInputReceived = false
+    
     
     // MARK: - viewdidload
     override func viewDidLoad() {
@@ -87,15 +94,31 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
     
     // MARK: - Start/Stop Button Action
     @IBAction func startStopBtnAct(_ sender: Any) {
+//        if audioEngine.isRunning {
+//            audioEngine.stop()
+//            recognitionRequest?.endAudio()
+//            startStopBtn.isEnabled = false
+//            startStopBtn.setTitle("Listen...", for: .normal)
+//
+//            // Clear the audio wave visualization
+//            audioWavePath.removeAllPoints()
+//            audioWaveLayer?.path = nil
+//        } else {
+//            startRecording()
+//            startStopBtn.setTitle("Stop", for: .normal)
+//        }
         if audioEngine.isRunning {
             audioEngine.stop()
             recognitionRequest?.endAudio()
             startStopBtn.isEnabled = false
             startStopBtn.setTitle("Listen...", for: .normal)
-            
+
             // Clear the audio wave visualization
             audioWavePath.removeAllPoints()
             audioWaveLayer?.path = nil
+
+            // Reset isAudioInputReceived saat tombol dihentikan.
+            isAudioInputReceived = false
         } else {
             startRecording()
             startStopBtn.setTitle("Stop", for: .normal)
@@ -119,22 +142,22 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
             // Handle errors if audio session configuration fails
             print("audioSession properties weren't set because of an error.")
         }
-        
+
         // Create a speech recognition request using SFSpeechAudioBufferRecognitionRequest.
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        
+
         // Check if the recognition request has been successfully created; if not, exit with a fatal error.
         guard let recognitionRequest = recognitionRequest else {
             fatalError("Unable to create an SFSpeechAudioBufferRecognitionRequest object")
         }
-        
+
         // Set options to report recognition results as they are processed
         recognitionRequest.shouldReportPartialResults = true
-        
+
         // Create a speech recognition task using speechRecognizer and recognitionRequest.
         recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest, resultHandler: { (result, error) in
             var isFinal = false
-            
+
             if result != nil {
                 // If a recognition result is available, process it
                 if let resultText = result?.bestTranscription.formattedString {
@@ -150,13 +173,13 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
                         }
                     }
                 }
-                
+
                 // Set the textView's text to the recognized text.
                 self.textView.text = result?.bestTranscription.formattedString
                 // Update the isFinal variable based on whether the result is final.
                 isFinal = (result?.isFinal)!
             }
-            
+
             // If there is an error or the result is final, stop the audioEngine and clean up.
             if error != nil || isFinal {
                 self.audioEngine.stop()
@@ -165,18 +188,24 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
                 self.startStopBtn.isEnabled = true
             }
         })
-        
+
         // Access the input audio node from the audioEngine.
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        
+
         // Install an audio tap on the inputNode to append audio data to the recognitionRequest.
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { (buffer, when) in
             self.recognitionRequest?.append(buffer)
-            // Update the audio wave visualization with the audio buffer
-            self.updateAudioWave(withBuffer: buffer)
+            
+            // Set isAudioInputReceived to true when audio input is received.
+            self.isAudioInputReceived = true
+            
+            // Update the audio wave visualization with the audio buffer if audio input is received.
+            if self.isAudioInputReceived {
+                self.updateAudioWave(withBuffer: buffer)
+            }
         }
-        
+
         // Prepare and start the audioEngine for recording
         audioEngine.prepare()
         do {
@@ -185,56 +214,69 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
             // Handle errors if the audioEngine couldn't start.
             print("audioEngine couldn't start because of an error.")
         }
-        
+
         textView.text = "Please say something"
     }
     
     func updateAudioWave(withBuffer buffer: AVAudioPCMBuffer) {
-        DispatchQueue.main.async {
-            // Extract audio data from the buffer.
-            let bufferData = buffer.floatChannelData?[0]
-            let bufferSize = UInt(buffer.frameLength)
-            var maxAmplitude: Float = 0.0
-            
-            // Iterate through the audio data to find the maximum amplitude.
-            for i in 0..<Int(bufferSize) {
-                let amplitude = fabsf(bufferData?[i] ?? 0.0)
-                if amplitude > maxAmplitude {
-                    maxAmplitude = amplitude
+        if isAudioInputReceived {
+            DispatchQueue.main.async {
+                // Extract audio data from the buffer.
+                let bufferData = buffer.floatChannelData?[0]
+                let bufferSize = UInt(buffer.frameLength)
+                var maxAmplitude: Float = 0.0
+                
+                // Iterate through the audio data to find the maximum amplitude.
+                for i in 0..<Int(bufferSize) {
+                    let amplitude = fabsf(bufferData?[i] ?? 0.0)
+                    if amplitude > maxAmplitude {
+                        maxAmplitude = amplitude
+                    }
+                }
+                
+                // Set a minimum amplitude threshold to consider as audio input (adjust as needed).
+                let minAudioAmplitudeThreshold: Float = 0.1
+                
+                // Check if the maximum amplitude exceeds the minimum threshold.
+                if maxAmplitude >= minAudioAmplitudeThreshold {
+                    // Calculate the new X and Y coordinate for drawing the audio wave.
+                    let x = CGFloat(self.audioWavePath.currentPoint.x + 1.0)
+                    let viewHeight = self.audioWaveView.bounds.height
+                    let newY = min(viewHeight, viewHeight - CGFloat(maxAmplitude) * (viewHeight))
+                    
+                    // Move the path to the new point and add a line segment to represent the audio wave.
+                    self.audioWavePath.move(to: CGPoint(x: x, y: newY))
+                    self.audioWavePath.addLine(to: CGPoint(x: x, y: viewHeight))
+                    
+                    // Set the updated path to the CAShapeLayer for visualizing the audio wave.
+                    self.audioWaveLayer?.path = self.audioWavePath.cgPath
+                    
+                    // Check if the X value has exceeded the width of the audioWaveView.
+                    if x > self.audioWaveView.bounds.width {
+                        // If so, reset the path to clear the visualization.
+                        self.audioWavePath.removeAllPoints()
+                        self.audioWaveLayer?.path = nil
+                    }
+                    
+                    // Reset the timer for silence detection.
+                    self.lastAudioReceivedTime = Date()
+                } else {
+                    // If the amplitude is below the threshold, consider it as silence.
+                    if let lastAudioReceivedTime = self.lastAudioReceivedTime {
+                        let currentTime = Date()
+                        let timeSinceLastAudio = currentTime.timeIntervalSince(lastAudioReceivedTime)
+                        if timeSinceLastAudio > self.silenceThresholdSeconds {
+                            // Silence detected for more than silenceThresholdSeconds, remove the wave.
+                            self.audioWavePath.removeAllPoints()
+                            self.audioWaveLayer?.path = nil
+                        }
+                    } else {
+                        self.lastAudioReceivedTime = Date()
+                    }
                 }
             }
-            
-            // Set a maximum amplitude threshold (adjust as needed).
-            let maxAllowedAmplitude: Float = 0.9 // Example threshold
-            
-            // Limit the maximum amplitude to the threshold.
-            maxAmplitude = min(maxAmplitude, maxAllowedAmplitude)
-            
-            // Calculate the new X and Y coordinate for drawing the audio wave.
-            let x = CGFloat(self.audioWavePath.currentPoint.x + 1.0)
-            let viewHeight = self.audioWaveView.bounds.height
-            let newY = min(viewHeight, viewHeight - CGFloat(maxAmplitude) * (viewHeight))
-            
-            // Move the path to the new point and add a line segment to represent the audio wave.
-            self.audioWavePath.move(to: CGPoint(x: x, y: newY))
-            self.audioWavePath.addLine(to: CGPoint(x: x, y: viewHeight))
-            
-            // Set the updated path to the CAShapeLayer for visualizing the audio wave.
-            self.audioWaveLayer?.path = self.audioWavePath.cgPath
-            
-            // Check if the X value has exceeded the width of the audioWaveView.
-            if x > self.audioWaveView.bounds.width {
-                // If so, reset the path to clear the visualization.
-                self.audioWavePath.removeAllPoints()
-                self.audioWaveLayer?.path = nil
-            }
-            
-            // Debug print statements
-            // print("Max Amplitude: \(maxAmplitude)")
-            // print("x: \(x), newY: \(newY)")
         }
     }
-    
     
     func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
         if available {
