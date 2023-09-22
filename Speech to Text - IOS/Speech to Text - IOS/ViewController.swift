@@ -109,7 +109,6 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
             recognitionTask?.cancel()
             recognitionTask = nil
         }
-        
         // Access the shared AVAudioSession instance and configure it for recording.
         let audioSession = AVAudioSession.sharedInstance()
         do {
@@ -205,16 +204,20 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
                 }
             }
             
-            // Calculate the new X and Y coordinates for drawing the audio wave.
+            // Set a maximum amplitude threshold (adjust as needed).
+            let maxAllowedAmplitude: Float = 0.9 // Example threshold
+            
+            // Limit the maximum amplitude to the threshold.
+            maxAmplitude = min(maxAmplitude, maxAllowedAmplitude)
+            
+            // Calculate the new X and Y coordinate for drawing the audio wave.
             let x = CGFloat(self.audioWavePath.currentPoint.x + 1.0)
             let viewHeight = self.audioWaveView.bounds.height
-            let newY = viewHeight - CGFloat(maxAmplitude) * (viewHeight)
-
+            let newY = min(viewHeight, viewHeight - CGFloat(maxAmplitude) * (viewHeight))
             
             // Move the path to the new point and add a line segment to represent the audio wave.
             self.audioWavePath.move(to: CGPoint(x: x, y: newY))
             self.audioWavePath.addLine(to: CGPoint(x: x, y: viewHeight))
-
             
             // Set the updated path to the CAShapeLayer for visualizing the audio wave.
             self.audioWaveLayer?.path = self.audioWavePath.cgPath
@@ -226,10 +229,12 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
                 self.audioWaveLayer?.path = nil
             }
             
-            print("Max Amplitude: \(maxAmplitude)")
-            print("x: \(x), newY: \(newY)")
+            // Debug print statements
+            // print("Max Amplitude: \(maxAmplitude)")
+            // print("x: \(x), newY: \(newY)")
         }
     }
+    
     
     func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
         if available {
