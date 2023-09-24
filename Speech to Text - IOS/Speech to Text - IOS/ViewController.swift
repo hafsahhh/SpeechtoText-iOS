@@ -36,6 +36,8 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
     // Adjust this threshold as needed
     private let silenceThresholdSeconds: TimeInterval = 1.0
     var isAudioInputReceived = false
+    private var isRecording = false
+    var animationLayer: CALayer?
     
     
     
@@ -78,6 +80,11 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
         audioWaveLayer?.strokeColor = audioWaveColor
         audioWaveLayer?.fillColor = UIColor.clear.cgColor
         audioWaveView.layer.addSublayer(audioWaveLayer!)
+        
+        // Initialize the animation layer
+        animationLayer = CALayer()
+        animationLayer?.frame = audioWaveView.bounds
+        audioWaveView.layer.addSublayer(animationLayer!)
     }
     
     // MARK: - Language Selection Action
@@ -95,129 +102,95 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
     
     // MARK: - Start/Stop Button Action
     @IBAction func startStopBtnAct(_ sender: Any) {
-        //        if audioEngine.isRunning {
-        //            audioEngine.stop()
-        //            recognitionRequest?.endAudio()
-        //            startStopBtn.isEnabled = false
-        //            startStopBtn.setTitle("Listen...", for: .normal)
-        //
-        //            // Clear the audio wave visualization
-        //            audioWavePath.removeAllPoints()
-        //            audioWaveLayer?.path = nil
-        //        } else {
-        //            startRecording()
-        //            startStopBtn.setTitle("Stop", for: .normal)
-        //        }
-        if audioEngine.isRunning {
-            audioEngine.stop()
-            recognitionRequest?.endAudio()
-            startStopBtn.isEnabled = false
-            startStopBtn.setTitle("Listen...", for: .normal)
-            
-            // Clear the audio wave visualization
-            audioWavePath.removeAllPoints()
-            audioWaveLayer?.path = nil
-            
-            // Reset isAudioInputReceived saat tombol dihentikan.
-            isAudioInputReceived = false
+        if isRecording {
+            stopRecording()
         } else {
             startRecording()
-            startStopBtn.setTitle("Stop", for: .normal)
         }
     }
     
-    // MARK: - Audio Recording Function
     func startRecording() {
-        // Check if there is an existing recognition task, cancel it, and set it to nil.
         if recognitionTask != nil {
             recognitionTask?.cancel()
             recognitionTask = nil
         }
-        // Access the shared AVAudioSession instance and configure it for recording.
+        
         let audioSession = AVAudioSession.sharedInstance()
         do {
             try audioSession.setCategory(AVAudioSession.Category.record)
             try audioSession.setMode(AVAudioSession.Mode.measurement)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            // Handle errors if audio session configuration fails
             print("audioSession properties weren't set because of an error.")
         }
         
-        // Create a speech recognition request using SFSpeechAudioBufferRecognitionRequest.
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        
-        // Check if the recognition request has been successfully created; if not, exit with a fatal error.
         guard let recognitionRequest = recognitionRequest else {
             fatalError("Unable to create an SFSpeechAudioBufferRecognitionRequest object")
         }
         
-        // Set options to report recognition results as they are processed
         recognitionRequest.shouldReportPartialResults = true
         
-        // Create a speech recognition task using speechRecognizer and recognitionRequest.
         recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest, resultHandler: { (result, error) in
             var isFinal = false
             
             if result != nil {
-                // If a recognition result is available, process it
                 if let resultText = result?.bestTranscription.formattedString {
-                    // Identify the language in the recognized text using Natural Language Processing.
                     let languageIdentifier = NLLanguageRecognizer.dominantLanguage(for: resultText)
                     if let languageCode = languageIdentifier?.rawValue {
-                        // If the recognized language is Indonesian, print "Indonesian Language."
                         if languageCode == "id" {
                             print("Indonesian Language")
-                            // If the recognized language is English, print "English Language."
                         } else if languageCode == "en" {
                             print("English Language")
                         }
                     }
-                    // Set the textView's text to the recognized text.
                     self.textView.text = resultText
                 }
                 
-                // Update the isFinal variable based on whether the result is final.
                 isFinal = (result?.isFinal)!
             }
             
-            // If there is an error or the result is final, stop the audioEngine and clean up.
             if error != nil || isFinal {
                 self.audioEngine.stop()
+                self.audioEngine.inputNode.removeTap(onBus: 0)
                 self.recognitionRequest = nil
                 self.recognitionTask = nil
                 self.startStopBtn.isEnabled = true
             }
         })
         
-        
-        // Access the input audio node from the audioEngine.
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         
-        // Install an audio tap on the inputNode to append audio data to the recognitionRequest.
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { (buffer, when) in
             self.recognitionRequest?.append(buffer)
-            
-            // Set isAudioInputReceived to true when audio input is received.
             self.isAudioInputReceived = true
-            
-            // Update the audio wave visualization with the audio buffer if audio input is received.
-            if self.isAudioInputReceived {
-                self.updateAudioWave(withBuffer: buffer)
-            }
+            self.updateAudioWave(withBuffer: buffer)
         }
         
-        // Prepare and start the audioEngine for recording
         audioEngine.prepare()
         do {
             try audioEngine.start()
         } catch {
-            // Handle errors if the audioEngine couldn't start.
             print("audioEngine couldn't start because of an error.")
         }
         
+        isRecording = true
+        startStopBtn.setTitle("Stop", for: .normal)
         textView.text = "Please say something"
+    }
+    
+    func stopRecording() {
+        if audioEngine.isRunning {
+            audioEngine.stop()
+            recognitionRequest?.endAudio()
+            startStopBtn.isEnabled = false
+            startStopBtn.setTitle("Start", for: .normal)
+            isRecording = false
+            self.audioWavePath.removeAllPoints()
+            self.audioWaveLayer?.removeFromSuperlayer()
+            self.animationLayer?.removeFromSuperlayer()
+        }
     }
     
     func updateAudioWave(withBuffer buffer: AVAudioPCMBuffer) {
@@ -242,23 +215,39 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
             maxAmplitude = min(maxAmplitude, maxAllowedAmplitude)
 
             // Calculate the new X and Y coordinate for drawing the audio wave.
-            let x = CGFloat(self.audioWavePath.currentPoint.x + 1.0)
+            let x: CGFloat
+            if self.audioWavePath.isEmpty {
+                // If the path is empty, initialize it with the starting point.
+                x = CGFloat(0.0)
+                let viewHeight = self.audioWaveView.bounds.height
+                let newY = min(viewHeight, viewHeight - CGFloat(maxAmplitude) * (viewHeight))
+                self.audioWavePath.move(to: CGPoint(x: x, y: newY))
+            } else {
+                x = CGFloat(self.audioWavePath.currentPoint.x + 1.0)
+            }
+            
             let viewHeight = self.audioWaveView.bounds.height
             let newY = min(viewHeight, viewHeight - CGFloat(maxAmplitude) * (viewHeight))
 
             // Move the path to the new point and add a line segment to represent the audio wave.
             self.audioWavePath.move(to: CGPoint(x: x, y: newY))
             self.audioWavePath.addLine(to: CGPoint(x: x, y: viewHeight))
-
-            // Set the updated path to the CAShapeLayer for visualizing the audio wave.
             self.audioWaveLayer?.path = self.audioWavePath.cgPath
 
             // Check if the X value has exceeded the width of the audioWaveView.
             if x > self.audioWaveView.bounds.width {
-                // If so, reset the path to clear the visualization.
-                self.audioWavePath.removeAllPoints()
-                self.audioWaveLayer?.path = nil
+                // Calculate the offset to shift the path within the UIView.
+                let xOffset = x - self.audioWaveView.bounds.width
+
+                // Limit the xOffset to the width of the audioWaveView.
+                let limitedXOffset = min(xOffset, self.audioWaveView.bounds.width)
+
+                // Shift the path by the limitedXOffset.
+                self.audioWavePath.apply(CGAffineTransform(translationX: -limitedXOffset, y: 0))
             }
+
+            // Set the updated path to the CAShapeLayer for visualizing the audio wave.
+            self.audioWaveLayer?.path = self.audioWavePath.cgPath
 
             // Check for audio silence and remove the wave if silence is detected.
             if maxAmplitude < self.silenceThreshold {
@@ -276,17 +265,21 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
             } else {
                 self.lastAudioReceivedTime = Date()
             }
+
+            // Create an animation to move the audio wave to the left.
+            let animation = CABasicAnimation(keyPath: "transform.translation.x")
+            animation.fromValue = 0
+            animation.toValue = -x
+            animation.duration = 0.1 // Adjust the animation speed as needed
+
+            // Apply the animation to the animationLayer.
+            self.animationLayer?.add(animation, forKey: "waveAnimation")
         }
     }
 
-
     
     func speechRecognizer(_ speechRecognizer: SFSpeechRecognizer, availabilityDidChange available: Bool) {
-        if available {
-            startStopBtn.isEnabled = true
-        } else {
-            startStopBtn.isEnabled = false
-        }
+        startStopBtn.isEnabled = available
     }
 }
 
